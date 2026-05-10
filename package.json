@@ -1,5 +1,5 @@
 {
-  "name": "@Yudzxml/baileys",
+  "name": "@yudzxml/baileys",
   "version": "7.3.2",
   "description": "WhatsApp API Modification By Yudzxml",
   "keywords": [
@@ -12,11 +12,22 @@
     "automation",
     "multi-device"
   ],
+  
   "homepage": "https://github.com/Yudzxml/Baileys",
+  
+  "bugs": {
+     "url": "https://github.com/Yudzxml/Baileys/issues"
+  },
+  
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/Yudzxml/Baileys.git"
+    "url": "https://github.com/Yudzxml/Baileys.git"
   },
+  
+  "publishConfig": {
+     "registry": "https://npm.pkg.github.com"
+  },
+  
   "license": "MIT",
   "author": "Yudzxml",
 
@@ -97,9 +108,5 @@
 
   "directories": {
     "lib": "lib"
-  },
-
-  "bugs": {
-    "url": "https://github.com/Yudzxml/Baileys/issues"
   }
 }
