@@ -1,7 +1,7 @@
 {
-  "name": "@itsukichan/baileys",
+  "name": "@Yudzxml/baileys",
   "version": "7.3.2",
-  "description": "WhatsApp API Modification By Itsukichann",
+  "description": "WhatsApp API Modification By Yudzxml",
   "keywords": [
     "whatsapp",
     "js-whatsapp",
@@ -18,7 +18,7 @@
     "url": "git+ssh://git@github.com/Yudzxml/Baileys.git"
   },
   "license": "MIT",
-  "author": "Itsukichann",
+  "author": "Yudzxml",
 
   "main": "lib/index.js",
   "files": [
@@ -100,6 +100,6 @@
   },
 
   "bugs": {
-    "url": "https://github.com/Itsukichann/Baileys/issues"
+    "url": "https://github.com/Yudzxml/Baileys/issues"
   }
 }
