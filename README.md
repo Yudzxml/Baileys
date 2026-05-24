@@ -77,8 +77,8 @@ import makeWASocket from '@yudzxml/baileys'
 
 ## 📚 Documentation
 
-- **[Official Channel](https://whatsapp.com/channel/0029Vb7rkVo5q08hZXxxrY3v)**
-- **[Group Community](https://chat.whatsapp.com/B9v9lXijkfPKr4QmAQgApu?mode=gi_t)**
+- **[Official Documentation](https://guide.whiskeysockets.io/)** (Core Baileys Docs)
+- **[Discord Community](https://discord.gg/nqssuNjjSH)**
 
 ---
 
@@ -289,6 +289,15 @@ await sock.sendMessage(jid, {
     text: 'AI Generated Message'
 }, {
     ai: true // Enable AI specific handling
+})
+```
+
+### Status Group
+```ts
+await sock.sendMessage(jid, {
+    groupStatusMessage: {
+    text: // support image/video
+   }
 })
 ```
 
