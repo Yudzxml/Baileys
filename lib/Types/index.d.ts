@@ -10,5 +10,6 @@ export * from "./Product.js";
 export * from "./Call.js";
 export * from "./Signal.js";
 export * from "./Mex.js";
+export * from "./RichType.js";
 export const DisconnectReason: any;
 //# sourceMappingURL=index.d.ts.map
