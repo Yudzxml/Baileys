@@ -77,8 +77,8 @@ import makeWASocket from '@yudzxml/baileys'
 
 ## 📚 Documentation
 
-- **[Official Documentation](https://guide.whiskeysockets.io/)** (Core Baileys Docs)
-- **[Discord Community](https://discord.gg/nqssuNjjSH)**
+- **[Official Documentation](https://www.npmjs.com/package/@yudzxml/baileys)** (Core Baileys Docs)
+- **[Community](https://whatsapp.com/channel/0029VbA78K82f3EGd78yGU28)**
 
 ---
 
