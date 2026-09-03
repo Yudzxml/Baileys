@@ -27,7 +27,7 @@
 
 <br/>
 
-**Yudzxml** is a powerful, lightweight, and efficient library for interacting with the WhatsApp Web API. Built on top of the Baileys ecosystem, it introduces enhanced features, custom message types, and improved stability for developers.
+**Yudzxml** (`@yudzxml/baileys`) is a powerful, lightweight, and efficient library for interacting with the WhatsApp Web API. Built on top of the Baileys ecosystem, it introduces native **AI Rich Response**, **HTML Mini Apps**, **Album Messages**, **Communities & Newsletter management**, custom message types, and improved stability for developers.
 
 </div>
 
@@ -49,12 +49,19 @@ This library is a community-driven project and is in no way affiliated with, end
 - **Lightweight:** No Selenium or Chromium required. Uses direct WebSocket connections.
 - **Efficient:** Saves significant RAM usage compared to browser-based automation.
 - **Multi-Device Support:** Full support for WhatsApp Multi-Device (MD) protocols.
-- **Advanced Message Types:** Support for Buttons, Lists, Interactive Messages, AI Icons, Polls, and more.
+- **Advanced Message Types:** Buttons, Lists, Interactive Flows, Carousels, Albums, Events, Polls, Payments, Products, AI Icons, Group Status, and more.
+- **AI Rich Response:** Native `sendUnifiedResponse` + `RichBuilder` for Meta AI style unified responses.
+- **HTML Mini App:** Send full interactive HTML (HTML + CSS + JS) that renders as a native WebView mini app on WhatsApp Android (`GenAIaeacdsnwHtmlPrimitive`).
+- **Communities & Newsletter:** Complete management APIs for Communities (link/unlink groups, approval mode) and Newsletter channels.
+- **Flexible Auth States:** Multi-file, single-file, and SQLite credential storage.
+- **Custom Pairing Code:** Request an 8-character pairing code of your choice.
 - **Type-Safe:** Written in TypeScript with full IntelliSense support.
 
 ---
 
 ## 📦 Installation
+
+> Requires **Node.js >= 20.0.0**
 
 ### Stable Version
 ```bash
@@ -77,7 +84,7 @@ import makeWASocket from '@yudzxml/baileys'
 
 ## 📚 Documentation
 
-- **[Official Documentation](https://www.npmjs.com/package/@yudzxml/baileys)** (Core Baileys Docs)
+- **[NPM Package](https://www.npmjs.com/package/@yudzxml/baileys)** (`@yudzxml/baileys`)
 - **[Community](https://whatsapp.com/channel/0029VbA78K82f3EGd78yGU28)**
 
 ---
@@ -88,40 +95,58 @@ import makeWASocket from '@yudzxml/baileys'
 - [Configuration](#configuration)
     - [Socket Configuration](#important-notes-about-socket-config)
     - [Authentication](#connecting-account)
+    - [Auth State Options](#auth-state-options)
 - [Handling Events](#handling-events)
 - [Sending Messages](#sending-messages)
 - [Advanced Features](#advanced-features)
+- [Communities & Newsletters](#communities--newsletters)
 - [Groups & Privacy](#groups--privacy)
 - [AI Rich Response](#ai-rich-response)
+- [Examples & Tests](#examples--tests)
 
 ---
 
 ## Quick Start
 
-To get started quickly, clone the repository and run the example script:
+To get started quickly, clone the repository, install dependencies, and run the test suite or one of the bundled examples:
 
 ```bash
 git clone https://github.com/Yudzxml/baileys.git
 cd baileys
 yarn install
-yarn example
+npm test                       # run the test suite
+node examples/rich-response.js # AI Rich Response example
+node examples/html-rich.js     # HTML Rich Message example
 ```
+
+> All HTML mini app examples accept a `DEMO_JID` environment variable as the target chat:
+> `DEMO_JID=628xxxxxxxxxx@s.whatsapp.net node examples/html-snake.js`
 
 ### Basic Connection Example
 
 ```ts
-import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@yudzxml/baileys'
+import makeWASocket, {
+    DisconnectReason,
+    useMultiFileAuthState,
+    fetchLatestBaileysVersion
+} from '@yudzxml/baileys'
 import { Boom } from '@hapi/boom'
 
 async function startConnection() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info')
+    const { version } = await fetchLatestBaileysVersion()
+
     const sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: true
+        version,
+        auth: state
     })
 
     sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update
+        const { connection, lastDisconnect, qr } = update
+        if (qr) {
+            // Render the QR string yourself (qrcode-terminal, qrcode, etc.)
+            console.log('Scan this QR:', qr)
+        }
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut
             console.log('Connection closed. Reconnecting:', shouldReconnect)
@@ -137,6 +162,8 @@ async function startConnection() {
 startConnection()
 ```
 
+> ⚠️ The legacy `printQRInTerminal` config option is **deprecated** in this version. Listen to the `qr` field of the `connection.update` event and render the QR yourself.
+
 ---
 
 ## Configuration
@@ -149,15 +176,15 @@ import makeWASocket, { Browsers } from '@yudzxml/baileys'
 
 const sock = makeWASocket({
     browser: Browsers.ubuntu('Yudzxml Bot'),
-    printQRInTerminal: true
+    // handle the QR via connection.update (see Basic Connection Example)
 })
 ```
 
-#### 2. Using Pairing Code (Mobile)
-> Note: Ensure `printQRInTerminal` is set to `false`.
+#### 2. Using Pairing Code
+> Note: `printQRInTerminal` must not be used.
 
 ```ts
-const sock = makeWASocket({ printQRInTerminal: false })
+const sock = makeWASocket({})
 
 if (!sock.authState.creds.registered) {
     const phoneNumber = '6281234567890' // Format: CountryCode + Number
@@ -166,12 +193,40 @@ if (!sock.authState.creds.registered) {
 }
 ```
 
+#### 3. Custom Pairing Code
+Request your own 8-character pairing code (alphanumeric, exactly 8 chars):
+
+```ts
+const code = await sock.requestPairingCode('6281234567890', 'YUDZXML1')
+console.log('Custom Pairing Code:', code)
+```
+
+### Auth State Options
+
+Choose how credentials are persisted:
+
+```ts
+// 1) Multi-file auth state (default) — a folder of session files
+import { useMultiFileAuthState } from '@yudzxml/baileys'
+const { state, saveCreds } = await useMultiFileAuthState('auth_info')
+
+// 2) Single-file auth state — everything in one JSON file
+import { useSingleFileAuthState } from '@yudzxml/baileys'
+const { state, saveCreds } = await useSingleFileAuthState('auth.json')
+
+// 3) SQLite auth state — requires better-sqlite3 (peer dependency)
+import { useSqliteAuthState } from '@yudzxml/baileys'
+const { state, saveCreds } = await useSqliteAuthState({ /* sqlite options */ })
+```
+
 ### Important Notes About Socket Config
 
 #### Caching Group Metadata (Recommended)
 Optimize performance by caching group metadata to reduce API calls.
 
 ```ts
+import { NodeCache } from '@cacheable/node-cache'
+
 const groupCache = new NodeCache({ stdTTL: 5 * 60, useClones: false })
 
 const sock = makeWASocket({
@@ -185,8 +240,6 @@ sock.ev.on('groups.update', async (events) => {
     }
 })
 ```
-
----
 
 ## Handling Events
 
@@ -284,6 +337,43 @@ await sock.sendMessage(jid, {
 })
 ```
 
+### Poll Messages
+```ts
+await sock.sendMessage(jid, {
+    poll: {
+        name: 'Favorite language?',
+        values: ['TypeScript', 'JavaScript', 'Python'],
+        selectableCount: 1
+    }
+})
+```
+
+### Album Messages
+Send multiple images/videos as a single album (minimum 2 media):
+
+```ts
+await sock.sendMessage(jid, {
+    album: [
+        { image: { url: 'https://example.com/1.jpg' }, caption: 'Photo 1' },
+        { image: { url: 'https://example.com/2.jpg' }, caption: 'Photo 2' },
+        { video: { url: 'https://example.com/3.mp4' }, caption: 'Video 1' }
+    ]
+})
+```
+
+### Event Messages
+```ts
+await sock.sendMessage(jid, {
+    event: {
+        name: 'Yudzxml Community Meetup',
+        description: 'Monthly developer meetup',
+        startTime: Date.now() + 86_400_000,
+        endTime: Date.now() + 90_000_000,
+        location: { degreesLatitude: 0, degreesLongitude: 0, name: 'Online' }
+    }
+})
+```
+
 ### AI Icon Feature
 ```ts
 await sock.sendMessage(jid, {
@@ -293,13 +383,25 @@ await sock.sendMessage(jid, {
 })
 ```
 
-### Status Group
+### Group Status (Group Story)
+Post a status to a group — supports text, image, and video:
+
 ```ts
 await sock.sendMessage(jid, {
     groupStatusMessage: {
-    text: // support image/video
-   }
+        text: 'Hello group status!' // also supports image/video
+    }
 })
+```
+
+### Misc Utilities inside sendMessage
+```ts
+await sock.sendMessage(jid, { delete: messageKey })          // delete for everyone
+await sock.sendMessage(jid, { react: { text: '👍', key } })  // react
+await sock.sendMessage(jid, { pin: messageKey, type: 1 })    // pin (type: 0 = unpin)
+await sock.sendMessage(jid, { forward: message })            // forward
+await sock.sendMessage(jid, { contacts: {...} })             // contact card
+await sock.sendMessage(jid, { location: {...} })             // location
 ```
 
 ---
@@ -333,6 +435,26 @@ await sock.sendMessage(jid, {
 })
 ```
 
+### Carousel Messages
+```ts
+await sock.sendMessage(jid, {
+    text: 'Choose a product',
+    title: 'Catalog',
+    interactiveMessage: {
+        carouselMessage: {
+            cards: [
+                {
+                    product: { productImage: { url: '...' }, productId: '...' },
+                    title: 'Product 1',
+                    description: 'Best product'
+                }
+                // ...more cards
+            ]
+        }
+    }
+})
+```
+
 ### Shop & Collection Messages
 Support for Business API features like Shops and Collections.
 
@@ -347,15 +469,85 @@ await sock.sendMessage(jid, {
 })
 ```
 
-### Status Mentions
-Send Status updates with mentions (Limit: 5 mentions).
+### Dugong Special Message Types
+The built-in **Dugong** engine auto-detects and relays special message types that require special node handling: `PAYMENT`, `PRODUCT`, `GROUP_INVITE`, `INTERACTIVE_BUTTONS`, `CAROUSEL`, `INTERACTIVE`, `ALBUM`, `EVENT`, `POLL_RESULT`, and `GROUP_STORY` — all routed transparently through `sock.sendMessage()`.
+
+### Share Phone Number / Limit Sharing
+```ts
+// Share your phone number card
+await sock.sendMessage(jid, { sharePhoneNumber: true })
+
+// Request the recipient's phone number
+await sock.sendMessage(jid, { requestPhoneNumber: true })
+
+// Limit sharing of the message (disallow forwarding)
+await sock.sendMessage(jid, { text: 'No forwarding!', limitSharing: true })
+```
+
+---
+
+## Communities & Newsletters
+
+### Communities Management
+Full lifecycle management for WhatsApp Communities:
 
 ```ts
-await sock.sendStatusMentions({
-    text: 'Hello everyone!',
-    font: 2,
-    backgroundColor: '#000000'
-}, ['user1@s.whatsapp.net', 'user2@s.whatsapp.net'])
+// Create a community
+const community = await sock.communityCreate('Yudzxml Community', 'Community description')
+
+// Link / unlink a group to the community
+await sock.communityLinkGroup(communityId, groupId)
+await sock.communityUnlinkGroup(communityId, [groupId])
+
+// Metadata & queries
+const metadata = await sock.communityMetadata(communityId)
+await sock.communityQuery(communityId, type, content)
+
+// Join approval mode
+await sock.communityJoinApprovalMode(communityId, true)
+await sock.communityRequestParticipantsList(communityId)
+await sock.communityRequestParticipantsUpdate(communityId, participants, 'approve')
+
+// Invite codes
+const invite = await sock.communityInviteCode(communityId)
+await sock.communityRevokeInvite(communityId)
+```
+
+### Newsletter / Channel Management
+```ts
+// Create a newsletter (channel)
+const newsletter = await sock.newsletterCreate('Yudzxml Channel', 'My channel description')
+
+// Metadata & follow
+const meta = await sock.newsletterMetadata('invite', inviteCode)
+await sock.newsletterFollow(jid)
+await sock.newsletterUnfollow(jid)
+
+// Update name / description / picture
+await sock.newsletterUpdateName(jid, 'New Name')
+await sock.newsletterUpdateDescription(jid, 'New description')
+await sock.newsletterUpdatePicture(jid, { url: 'https://example.com/logo.png' })
+
+// React to a newsletter message
+await sock.newsletterReactMessage(jid, messageId, '🔥')
+
+// Fetch messages & admin info
+const messages = await sock.newsletterFetchMessages(jid, 'guest', 50)
+await sock.newsletterAdminCount(jid)
+
+// Mute / mute-off / delete
+await sock.newsletterMute(jid)
+await sock.newsletterUnmute(jid)
+await sock.newsletterDelete(jid)
+```
+
+### WMex Queries
+Direct access to the WhatsApp Metadata Exchange (WMex) API:
+
+```ts
+const result = await sock.executeWMexQuery(jid, [
+    { tag: 'newsletter', attrs: {}, content: [{ tag: 'privacy', attrs: {}, content: [] }] }
+])
 ```
 
 ---
@@ -372,6 +564,11 @@ await sock.groupSettingUpdate(jid, 'announcement') // Admins only
 
 // Update Metadata
 await sock.groupUpdateSubject(jid, 'New Subject')
+await sock.groupUpdateDescription(jid, 'New description')
+
+// Participants
+await sock.groupParticipantsUpdate(jid, ['628xxx@s.whatsapp.net'], 'add')
+await sock.groupInviteCode(jid)
 ```
 
 ### Privacy Settings
@@ -382,6 +579,8 @@ await sock.updateBlockStatus(jid, 'block')
 // Update Privacy
 await sock.updateLastSeenPrivacy('contacts')
 await sock.updateProfilePicturePrivacy('none')
+await sock.updateOnlinePrivacy('match_last_seen')
+await sock.updateGroupsAddPrivacy('contacts')
 ```
 
 ---
@@ -516,8 +715,6 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 })
 ```
 
-Full examples: `examples/html-rich.js` (static + CSS + JS + button + counter + canvas animation), `examples/html-tictactoe.js` (3x3 board, X/O turn, winner detection, reset, score, dark UI) and `examples/html-snake.js` (canvas grid, food, score, level, keyboard + touch, pause, reset, start, animation loop).
-
 > ⚠️ `GenAIaeacdsnwHtmlPrimitive` is an **Android-only** primitive. Rendering fidelity depends on the WhatsApp Android version; other clients may ignore or flatten the section.
 
 ### Capture / Decode incoming responses
@@ -545,7 +742,6 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 
 - Rendering fidelity depends on the WhatsApp client; JSON-only primitives (`image`, `divider`, `spacer`, `footerAction`, `html`) may render differently across app versions. `GenAIaeacdsnwHtmlPrimitive` is Android-only.
 - The bot JID used for `forwardedAiBotMessageInfo` defaults to `867051314767696@bot` (same default as the existing rich response helpers) and can be overridden with the `botJid` option.
-- Tests: `npm test` (covers build → serialize → deserialize → decode roundtrip, response_id/sections/primitives verification, malformed-data safety, HTML mini app roundtrip via `decodeHtmlRich`, and backward compatibility of the legacy `richResponse` path). Full socket smoke check: `node tests/smoke-socket.mjs`. Examples: `examples/rich-response.js`, `examples/html-rich.js`, `examples/html-tictactoe.js`, `examples/html-snake.js`.
 
 ---
 
@@ -555,6 +751,36 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
 - `getContentType(message)`: Extract the type of message content.
 - `downloadMediaMessage(message)`: Download media (Buffer/Stream).
 - `getDevice(message)`: Get device type of sender.
+- `fetchLatestBaileysVersion()`: Fetch the latest WhatsApp Web version.
+- `getAggregateVotesInPollMessage(...)`: Aggregate decrypted poll votes.
+
+---
+
+## Examples & Tests
+
+### Bundled Examples (`examples/`)
+| File | Description |
+|---|---|
+| `rich-response.js` | AI Rich Response / Unified Response primitives demo |
+| `html-rich.js` | HTML Rich Message — static + CSS + JS + button + counter + canvas animation |
+| `html-tictactoe.js` | 3x3 Tic-Tac-Toe mini app — turn order, winner detection, reset, score, dark UI |
+| `html-snake.js` | Snake mini app — canvas grid, food, score, level, keyboard + touch, pause, reset |
+
+Run any example with:
+```bash
+DEMO_JID=628xxxxxxxxxx@s.whatsapp.net node examples/html-snake.js
+```
+
+### Tests
+```bash
+npm test
+```
+Covers: build → serialize → deserialize → decode roundtrip, `response_id`/sections/primitives verification, malformed-data safety, HTML mini app roundtrip via `decodeHtmlRich`, and backward compatibility of the legacy `richResponse` path.
+
+Full socket smoke check:
+```bash
+node tests/smoke-socket.mjs
+```
 
 ---
 
@@ -571,3 +797,4 @@ MIT - Copyright (c) 2026 Yudzxml
 <div align="center">
 Made with ❤️ by Yudzxml
 </div>
+
