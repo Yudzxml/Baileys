@@ -65,13 +65,23 @@ export interface RichFooterActionSection {
     ctaUrl: string;
     ctaType?: string;
 }
+/** GenAIaeacdsnwHtmlPrimitive — HTML Mini App (unified JSON only, android-only primitive) */
+export interface RichHtmlPrimitive {
+    kind: 'html';
+    /** Full HTML document (doctype + <style> + <script>) sent verbatim inside primitive.payload */
+    html: string;
+    /** primitive.trusted_sources — default [] */
+    trustedSources?: string[];
+    /** Lock the mini app to a fixed pixel height with a scrollable shim */
+    height?: number;
+}
 /** Pass-through for a real captured unified response section */
 export interface RichRawSection {
     kind: 'raw';
     section: UnifiedResponseSection;
 }
 /** Union of all builder primitives */
-export type RichPrimitive = RichMarkdownPrimitive | RichCodePrimitive | RichTablePrimitive | RichInlineImagePrimitive | RichLatexPrimitive | RichItemsPrimitive | RichImageSection | RichDividerSection | RichSpacerSection | RichFooterActionSection | RichRawSection;
+export type RichPrimitive = RichMarkdownPrimitive | RichCodePrimitive | RichTablePrimitive | RichInlineImagePrimitive | RichLatexPrimitive | RichItemsPrimitive | RichImageSection | RichDividerSection | RichSpacerSection | RichFooterActionSection | RichHtmlPrimitive | RichRawSection;
 /** A single section of the unified response JSON payload */
 export interface UnifiedResponseSection {
     view_model?: {
@@ -150,8 +160,65 @@ export declare const RichBuilder: {
     divider: () => RichDividerSection;
     spacer: () => RichSpacerSection;
     footerAction: (ctaText: string, ctaUrl: string, ctaType?: string) => RichFooterActionSection;
+    html: (html: string, options?: Omit<RichHtmlPrimitive, 'kind' | 'html'>) => RichHtmlPrimitive;
     raw: (section: UnifiedResponseSection) => RichRawSection;
 };
+/** Exact primitive typename used on the wire for HTML Mini Apps — do not rename */
+export declare const AI_RICH_HTML_PRIMITIVE: 'GenAIaeacdsnwHtmlPrimitive';
+/** Height-lock shim prepended to the HTML payload when `height` is given */
+export declare function lockHeight(height: number): string;
+/** Options for htmlSection() / RichBuilder.html() */
+export interface HtmlRichSectionOptions {
+    trustedSources?: string[];
+    height?: number;
+}
+/**
+ * Build a raw GenAIaeacdsnwHtmlPrimitive unified section
+ * ({ view_model: { primitive: { payload, trusted_sources, __typename }, __typename } }).
+ * Pass-through compatible with sendUnifiedResponse sections and RichBuilder.raw().
+ */
+export declare function htmlSection(html: string, options?: HtmlRichSectionOptions): UnifiedResponseSection;
+/** One GenAIaeacdsnwHtmlPrimitive found by decodeHtmlRich() */
+export interface DecodedHtmlRichSection {
+    html: string | null;
+    trustedSources: string[];
+    section: UnifiedResponseSection;
+    primitive: Record<string, any>;
+}
+/** Result of decodeHtmlRich() — never throws */
+export interface DecodedHtmlRich {
+    found: boolean;
+    responseId: string | null;
+    html: string | null;
+    trustedSources: string[];
+    section: UnifiedResponseSection | null;
+    htmlSections: DecodedHtmlRichSection[];
+    sections: UnifiedResponseSection[];
+    /** raw wire-level payload info (utf8/base64/hex/json fallbacks) from decodeUnifiedResponse */
+    raw: DecodedUnifiedRaw;
+    /** full decodeUnifiedResponse() result */
+    decoded: DecodedUnifiedResponse;
+}
+/** Find + extract GenAIaeacdsnwHtmlPrimitive payloads from any message shape */
+export declare function decodeHtmlRich(message: any): DecodedHtmlRich;
+/** Options for sendHtmlApp() */
+export interface SendHtmlAppOptions extends HtmlRichSectionOptions {
+    /** botMetadata.messageDisclaimerText */
+    title?: string;
+    /** markdown text shown above the app (alias of text) */
+    label?: string;
+    /** markdown text shown above the app */
+    text?: string;
+    responseId?: string;
+    botJid?: string;
+    botName?: string;
+    /** send the protocolMessage(type 14) MESSAGE_EDIT follow-up — default true */
+    bypassDownload?: boolean;
+    additionalNodes?: any[];
+    [key: string]: any;
+}
+/** Send a standalone HTML Mini App in one call (sock-first signature, reference-compatible) */
+export declare function sendHtmlApp(sock: any, jid: string, html: string, options?: SendHtmlAppOptions): Promise<any>;
 export declare function prepareUnifiedResponseMessage(content: UnifiedResponseOptions): RichResponseContent;
 export declare function decodeUnifiedResponse(message: any): DecodedUnifiedResponse;
 export declare const captureUnifiedResponse: typeof decodeUnifiedResponse;

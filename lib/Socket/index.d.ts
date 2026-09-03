@@ -248,6 +248,7 @@ declare function makeWASocket(config: any): {
     updateMediaMessage: (message: any) => Promise<any>;
     sendMessage: (jid: any, content: any, options?: {}) => Promise<import("../index.js").proto.WebMessageInfo | undefined>;
     sendUnifiedResponse: (jid: any, content: any, sections?: any, options?: {}) => Promise<import("../index.js").proto.WebMessageInfo | undefined>;
+    sendHtmlApp: (jid: any, html: any, options?: import("../Utils/rich-response-builder.js").SendHtmlAppOptions) => Promise<import("../index.js").proto.WebMessageInfo | undefined>;
     executeWMexQuery: (variables: any, queryId: any, dataPath: any) => Promise<any>;
     newsletterCreate: (name: any, description: any) => Promise<{
         id: any;
