@@ -1,6 +1,6 @@
 {
   "name": "@yudzxml/baileys",
-  "version": "7.5.0",
+  "version": "7.5.1",
   "description": "WhatsApp API Modification By Yudzxml",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
