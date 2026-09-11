@@ -33,12 +33,14 @@
 
 On top of the Baileys ecosystem, this fork introduces its own enhancements:
 
-- 🤖 **Native AI Rich Response / Unified Response** (`sendUnifiedResponse` + `RichBuilder`) — the styled *Meta AI* message format.
+- 🤖 **Native AI Rich Response** (`AIRich` + full MessageBuilder 4.7) — the styled *Meta AI* message format with live-edit (`sendEdit()`), buttons and carousels.
 - 🌐 **HTML Mini Apps** (`sendHtmlApp`) — full interactive HTML/CSS/JS rendered as a native WebView inside WhatsApp Android.
 - 🧩 **Dugong engine** — automatic handling of Albums, Carousels, Events, Payments, Products, Poll Results, and Group Stories.
 - 🏘️ **Complete Communities, Newsletter, Business & Privacy APIs**.
 - 🔐 **Three auth-state backends** — multi-file, single-file JSON, and SQLite.
 - 🎫 **Custom 8-character pairing codes**.
+
+> **🆕 What's new in 7.6.0** — the WhatsApp Web protocol version was bumped to `2.3000.1046909856` (the freshest handshake used by `@rexxhayanasi/elaina-baileys` 1.3.9, September 2026) and the old `RichBuilder` API was replaced by the complete **MessageBuilder 4.7** engine (`AIRich`, `Button`, `ButtonV2`, `Carousel`, `Toolkit`, `sendEdit()` live-edit, `htmlSection`/`sendHtmlApp`, `decodeAIRich`). Socket methods `sendUnifiedResponse` / `sendHtmlApp` remain as compatibility shims over the new engine.
 
 </div>
 
@@ -77,7 +79,7 @@ This library is a community-driven project and is **in no way affiliated with, e
 - [Newsletters](#newsletter--channel-management)
 - [Groups & Privacy](#-groups--privacy)
 - [AI Rich Response](#-ai-rich-response)
-    - [Unified Response & RichBuilder](#sending-a-unified-response)
+    - [AIRich](#airich--basic-send)
     - [HTML Mini App](#html-mini-app--html-rich-message-genaiaeacdsnwhtmlprimitive)
     - [Decoding & Capture](#capture--decode-incoming-responses)
 - [Project Structure](#%EF%B8%8F-project-structure)
@@ -114,7 +116,7 @@ This library is a community-driven project and is **in no way affiliated with, e
 ### Exclusive Enhancements
 | Feature | Description |
 |---|---|
-| 🤖 **AI Rich Response** | Native `sendUnifiedResponse` + `RichBuilder` for Meta AI style unified responses (markdown, code, tables, LaTeX, inline images, carousels). |
+| 🤖 **AI Rich Response** | Integrated `MessageBuilder` (AIRich / Button / Carousel / Toolkit) for Meta AI style rich responses with live-edit, buttons, carousels and HTML mini apps. |
 | 🌐 **HTML Mini App** | `sendHtmlApp` — full interactive HTML/CSS/JS rendered as a native WebView mini app on WhatsApp Android (`GenAIaeacdsnwHtmlPrimitive`). |
 | 🧩 **Dugong Engine** | Auto-detects & relays special types: `PAYMENT`, `PRODUCT`, `GROUP_INVITE`, `INTERACTIVE_BUTTONS`, `CAROUSEL`, `INTERACTIVE`, `ALBUM`, `EVENT`, `POLL_RESULT`, `GROUP_STORY`. |
 | 🏘️ **Communities API** | Create, link/unlink groups, approval modes, participant requests, invite codes. |
@@ -183,14 +185,15 @@ cd baileys
 yarn install
 
 npm test                        # run the test suite
-node examples/rich-response.js  # AI Rich Response demo
-node examples/html-rich.js      # HTML Rich Message demo
+node examples/ai-rich.js           # AI Rich Response + live-edit demo
+node examples/html-rich.js         # HTML Mini App demo
+node examples/buttons-carousel.js  # Button / list / carousel demo
 ```
 
 All HTML mini app examples accept a `DEMO_JID` environment variable as the target chat:
 
 ```bash
-DEMO_JID=628xxxxxxxxxx@s.whatsapp.net node examples/html-snake.js
+DEMO_JID=628xxxxxxxxxx@s.whatsapp.net node examples/html-rich.js
 ```
 
 ### Minimal Connection Example
@@ -862,163 +865,124 @@ await sock.fetchStatus(jid)
 await sock.createCallLink()
 ```
 
-## 🤖 AI Rich Response
+## 🤖 AI Rich Response (MessageBuilder 4.7)
 
-Native support for WhatsApp **AI Rich Response / Unified Response** messages — the styled "Meta AI" message format (`botForwardedMessage` → `richResponseMessage` → `unifiedResponse`). This feature is built directly into the library, nothing to enable, and fully backward compatible with the existing API.
+Full support for WhatsApp **AI Rich Response / Unified Response** messages — the styled "Meta AI" message format (`botForwardedMessage` → `richResponseMessage` → `unifiedResponse`). 7.6.0 ships the complete **MessageBuilder 4.7** engine (ported from `@rexxhayanasi/elaina-baileys`, credits to Nixel / rexxhayanasi preserved in the source header): `AIRich`, `Button`, `ButtonV2`, `Carousel`, `Toolkit` plus the section helpers in `lib/MessageBuilder/extras.js`.
 
-### Sending a Unified Response
+> ⚠️ **Breaking change in 7.6.0** — the old 622-line `RichBuilder` API was removed. Use `new AIRich(sock)` directly; the `sock.sendUnifiedResponse()` / `sock.sendHtmlApp()` socket methods remain as thin compatibility shims on top of the new engine.
+
+### AIRich — basic send
 
 ```ts
-import { RichBuilder } from '@yudzxml/baileys'
+import { AIRich } from '@yudzxml/baileys'
 
-// Preferred form
-await sock.sendUnifiedResponse(jid, {
-    text: '*MEGUMIN ARCADE*\nJOGO DA VELHA',
-    sections: [
-        RichBuilder.markdown('CONTRA IA  •  2 JOGADORES'),
-        RichBuilder.table([
-            ['X', 'O', 'X'],
-            ['O', 'X', 'O'],
-            [' ', 'X', ' ']
-        ], '3x3 BOARD', true), // title, noHeading
-        RichBuilder.divider(),
-        RichBuilder.footerAction('NOVA RODADA', 'https://example.com/new-round')
-    ],
-    disclaimerText: 'AI generated' // optional
-})
+const rich = new AIRich(sock)
+    .setTitle('MEGUMIN ARCADE')      // disclaimer line above the card
+    .setFooter('Made with baileys')
+    .addText('Hello *rich world*')
+    .addCode('javascript', 'console.log("hi")')
+    .addTable([['X', 'O', 'X'], ['O', 'X', 'O']])
 
-// Positional form
-await sock.sendUnifiedResponse(jid, 'MEGUMIN RICH XO', [RichBuilder.markdown('hello')])
-
-// Also works through the normal sendMessage content API
-await sock.sendMessage(jid, { unifiedResponse: { text: 'hello', sections: [...] } })
+await rich.send(jid)
 ```
 
-The helper builds the full protobuf chain for you — `botForwardedMessage` → `message` → `richResponseMessage` → `messageType` → `submessages` → `unifiedResponse` → `data` — with `unifiedResponse.data` serialized as **bytes** (JSON UTF-8 in a Buffer) exactly as WAProto expects, and `botMetadata.botResponseId` mirroring the unified `response_id`.
+The builder assembles the full protobuf chain for you — `botForwardedMessage` → `message` → `richResponseMessage` → `messageType` → `submessages` → `unifiedResponse` → `data` — with `unifiedResponse.data` serialized as base64 JSON exactly as WAProto expects, and `botMetadata.botResponseId` mirroring the unified `response_id`.
 
-### Primitives
+### AIRich — available helpers
 
-| Builder | Renders as | Level | Status |
-|---|---|---|---|
-| `RichBuilder.markdown(text)` | Markdown text | proto submessage + JSON | ✅ Verified |
-| `RichBuilder.code(code, lang)` | Highlighted code block | proto submessage + JSON | ✅ Verified |
-| `RichBuilder.table(rows, title?)` | Table | proto submessage + JSON | ✅ Verified |
-| `RichBuilder.latex(text, exprs)` | LaTeX | proto submessage + JSON | ✅ Verified |
-| `RichBuilder.inlineImage({...})` | Inline image | proto submessage + JSON | ✅ Verified |
-| `RichBuilder.items([...])` | Carousel | proto submessage + JSON | ✅ Verified |
-| `RichBuilder.image(url)` | Image section | JSON only | ✅ Verified (captured) |
-| `RichBuilder.divider()` / `spacer()` | Layout separators | JSON only | ✅ Verified (captured) |
-| `RichBuilder.footerAction(text, url)` | Footer CTA button | JSON only | ⚠️ Community-captured |
-| `RichBuilder.html(html, opts?)` | **HTML Mini App / interactive WebView** | JSON only | ✅ Wire format from @rexxhayanasi/elaina-baileys 1.3.8 |
-| `RichBuilder.raw(section)` | Any captured section | JSON only | ✅ For capture-replay |
+| Helper | Renders as |
+|---|---|
+| `addText(text, opts?)` | Markdown text |
+| `addCode(lang, code, opts?)` | Highlighted code block |
+| `addTable(rows, opts?)` | Table |
+| `addSource(sources?, opts?)` | Citation/source list |
+| `addReels(items?, opts?)` | Reels carousel |
+| `addImage(url, opts?)` | Inline image (incl. GENERATING placeholder) |
+| `addVideo(url, opts?)` | Inline video |
+| `addProduct(data?, opts?)` | Product card |
+| `addPost(data?, opts?)` | Post card |
+| `addMetadata(text, opts?)` | Metadata line |
+| `addTip(text, opts?)` | Tip line |
+| `addWidget(data, opts?)` | Generic widget |
+| `addFooterAction(data, opts?)` | Footer CTA button |
+| `addSuggest(suggestion, opts?)` | Follow-up suggestion pill |
+| `addSection(section, opts?)` | Raw unified section (see extras below) |
+| `AIRich.newLayout(name, data, extra?)` | Layout wrapper (`Single`, `HScroll`, `VStack`, `Grid`, ...) |
 
-"Verified" means the primitive appears in the generated WhatsApp protobuf definitions and/or in decompiled WhatsApp Web renderers (`cometComposedTextV2GenAiUxPrimitiveParser`) and/or in real message captures. **Not verified / do not exist**: `GenAIGameUXPrimitive`, `GenAIInteractiveGamePrimitive`, or any game board schema. `UNIFIED_RESPONSE_EMBEDDED_SCREENS` is only a capability enum value (`BotCapabilityType = 60`) — no message schema is known for it.
+### Live edit — sendEdit()
 
-### Games (jogo da velha style UI)
+Cards can be edited after delivery; WhatsApp re-renders the same bubble:
 
-Interactive **HTML mini apps** (Tic-Tac-Toe, Snake, counters, canvas animations, etc.) are supported through `GenAIaeacdsnwHtmlPrimitive` — see the next section. There is no verified native *game board* primitive (`GenAIGameUXPrimitive` does not exist); real game cards seen in the wild are most likely server-driven Bloks UI (`FOABloksPrimitive`). To find that schema:
+```ts
+const rich = new AIRich(sock).addText('Working on it…', { id: 'intro' })
+await rich.send(jid)
 
-1. Run the capture tool below while a real game card is displayed in an official Meta AI chat.
-2. Feed the captured `view_model`/`primitive` structure back through `RichBuilder.raw(section)`.
+rich.addImage('', { status: 'GENERATING', insertAt: 'intro', id: 'pic' })
+await rich.sendEdit()          // reuses the key of the last send()
+
+rich.addImage('https://example.com/result.jpg', { replace: 'pic' })
+await rich.sendEdit()
+```
+
+Item bookkeeping: `rich.getIds()`, `rich.hasId(id)`, `rich.peek(id)`, `rich.assignId(index, id)`, `rich.delete(id)`. Bad targets throw typed errors — `ItemNotFoundError`, `DuplicateIdError`, `InvalidTargetError`, `ContentValidationError` (all extend `AIRichError`).
 
 ### HTML Mini App / HTML Rich Message (GenAIaeacdsnwHtmlPrimitive)
 
-Send a **full interactive HTML document** (HTML + CSS + JavaScript) that WhatsApp Android renders as a native Rich UI / WebView mini app — not as plain text, not as a code block, not as markdown.
+Send a **full interactive HTML document** (HTML + CSS + JavaScript) that WhatsApp Android renders as a native Rich UI / WebView mini app:
 
 ```ts
-import { RichBuilder, htmlSection, sendHtmlApp } from '@yudzxml/baileys'
+import { htmlSection, sendHtmlApp, checkHtmlApp } from '@yudzxml/baileys'
 
 const html = `<!DOCTYPE html>
-<html>
-<head>
-<style>
-body { background: #111; color: white; font-family: sans-serif; text-align: center; }
-button { padding: 12px; border-radius: 10px; }
-</style>
-</head>
-<body>
+<html><body style="background:#111;color:#fff">
 <h2>YUDZXML HTML RICH</h2>
 <div id="count">0</div>
-<button onclick="add()">+1</button>
-<script>
-let count = 0
-function add() {
-  count++
-  document.getElementById('count').textContent = count
-}
-</script>
-</body>
-</html>`
+<button onclick="document.getElementById('count').textContent = ++count">+1</button>
+<script>let count = 0</script>
+</body></html>`
 
-// 1) Through the unified response API (like every other primitive)
-await sock.sendUnifiedResponse(jid, {
-    text: 'YUDZXML HTML APP',
-    sections: [RichBuilder.html(html)]
+// 1) One-shot helper (sock-first, same signature as the reference implementation)
+await sendHtmlApp(sock, jid, html, {
+    title: 'YUDZXML HTML APP',   // disclaimer line
+    label: 'Demo counter',       // text fallback for WA Web/Desktop
+    height: 420,                 // pin the card height
+    trustedSources: []
 })
 
-// 2) Raw section form (pass-through compatible)
-await sock.sendUnifiedResponse(jid, { sections: [htmlSection(html)] })
+// 2) Socket shim (same options)
+await sock.sendHtmlApp(jid, html, { label: 'Demo counter' })
 
-// 3) One-shot helper — relay + bypassDownload MESSAGE_EDIT follow-up (recommended)
-await sock.sendHtmlApp(jid, html, {
-    title: 'YUDZXML HTML APP',   // botMetadata.messageDisclaimerText
-    text: 'Demo counter',         // markdown text above the app
-    height: 420,                  // optional fixed height with scroll shim
-    trustedSources: [],           // primitive.trusted_sources
-    bypassDownload: true          // default: send the type-14 MESSAGE_EDIT follow-up
-})
-
-// 4) Standalone, sock-first (same signature as the reference implementation)
-await sendHtmlApp(sock, jid, html, { title: 'YUDZXML SNAKE' })
+// 3) Inside a bigger AIRich card
+const rich = new AIRich(sock).addText('Menemani mini app:')
+rich.addSection(htmlSection(html, { height: 420 }))
+await rich.send(jid)
 ```
 
-**Wire format** (reverse-engineered from `@rexxhayanasi/elaina-baileys` 1.3.8, `htmlSection()` + `AIRich.build()/send()/decodeAIRich()`): the HTML travels verbatim inside a JSON-only unified section `{ view_model: { primitive: { payload, trusted_sources, __typename: 'GenAIaeacdsnwHtmlPrimitive' }, __typename: 'GenAISingleLayoutViewModel' } }` → unified JSON `{ response_id, sections }` → bytes in `AIRichResponseMessage.unifiedResponse.data` (field 3) → `Message.botForwardedMessage` (field 834) → `relayMessage`, followed by the proven `protocolMessage(type 14 MESSAGE_EDIT)` edit carrying `editedMessage` — the `bypassDownload` flow that makes WhatsApp Android actually render the mini app. No protobuf schema changes were needed; the existing `AIRichResponseMessage` structure is used as-is.
+`sendHtmlApp` relays **once** by default (no flicker for static cards); pass `bypassDownload: true` to add the proven `protocolMessage(type 14 MESSAGE_EDIT)` follow-up that forces a re-render. `checkHtmlApp(html)` runs a pre-flight audit (wire size budget, remote resources, storage APIs, timers) and returns `{ ok, problems, warnings }` — the WebView is offline and opaque-origin, so heed its warnings.
 
-**Decoding / capture:**
+**Wire format**: the HTML travels verbatim inside a JSON-only unified section `{ view_model: { primitive: { payload, trusted_sources, __typename: 'GenAIaeacdsnwHtmlPrimitive' }, __typename: 'GenAISingleLayoutViewModel' } }` → unified JSON `{ response_id, sections }` → bytes in `AIRichResponseMessage.unifiedResponse.data` (field 3) → `Message.botForwardedMessage` (field 834) → `relayMessage`.
 
-```ts
-import { decodeHtmlRich } from '@yudzxml/baileys'
+> ⚠️ `GenAIaeacdsnwHtmlPrimitive` is an **Android-only** primitive. WA Web/Desktop show only the `label` text; iOS is untested.
 
-sock.ev.on('messages.upsert', async ({ messages }) => {
-    for (const msg of messages) {
-        const decoded = decodeHtmlRich(msg) // never throws
-        if (decoded.found) {
-            console.log(decoded.html)            // original HTML, byte-exact
-            console.log(decoded.trustedSources)  // primitive.trusted_sources
-            console.log(decoded.section)         // raw unified section
-            console.log(decoded.raw)             // wire-level utf8/base64/hex fallbacks
-        }
-    }
-})
-```
-
-> ⚠️ `GenAIaeacdsnwHtmlPrimitive` is an **Android-only** primitive. Rendering fidelity depends on the WhatsApp Android version; other clients may ignore or flatten the section.
-
-### Capture / Decode incoming responses
+### Reading rich messages back
 
 ```ts
-import { decodeUnifiedResponse, captureUnifiedResponse } from '@yudzxml/baileys'
+import { decodeAIRich, htmlSection } from '@yudzxml/baileys'
 
-sock.ev.on('messages.upsert', async ({ messages }) => {
+sock.ev.on('messages.upsert', ({ messages }) => {
     for (const msg of messages) {
-        const decoded = captureUnifiedResponse(msg) // alias of decodeUnifiedResponse
-        if (decoded.found) {
+        const decoded = decodeAIRich(msg)     // null when not a rich message
+        if (decoded) {
             console.log('response_id:', decoded.responseId)
-            console.log('primitives:', decoded.primitives.map(p => p.__typename))
-            console.log('sections:', decoded.unified?.sections)
-            // raw fallbacks (always available, even for non-JSON data):
-            console.log(decoded.raw.hex, decoded.raw.base64, decoded.raw.utf8, decoded.raw.jsonError)
+            console.log('layouts:', decoded.layouts)        // ['Single', 'HScroll', ...]
+            console.log('primitives:', decoded.typenames)   // ['GenAIMarkdownTextUXPrimitive', ...]
+            console.log('sections:', decoded.sections)
         }
     }
 })
 ```
 
-`decodeUnifiedResponse()` accepts a full `WAMessage`, a message content object, or a bare `richResponseMessage`. It **never throws** — malformed payloads are reported through `raw.jsonError` / `error` while `raw.hex`, `raw.base64` and `raw.utf8` still expose the raw bytes for analysis.
-
-### Limitations
-
-- Rendering fidelity depends on the WhatsApp client; JSON-only primitives (`image`, `divider`, `spacer`, `footerAction`, `html`) may render differently across app versions. `GenAIaeacdsnwHtmlPrimitive` is Android-only.
-- The bot JID used for `forwardedAiBotMessageInfo` defaults to `867051314767696@bot` (same default as the existing rich response helpers) and can be overridden with the `botJid` option.
+Reuse an incoming card by feeding it back through the builder: `new AIRich(sock).loadFrom(msg.message)` — then edit and `sendEdit()` it like any other card.
 
 ---
 
@@ -1071,9 +1035,12 @@ Baileys/
 │   │   ├── decode-wa-message.js  # Raw WA message → protobuf normalization
 │   │   ├── process-message.js    # Incoming message pipeline (decrypt, receipts, events)
 │   │   ├── message-retry-manager.js # Retry scheduling + device sentinel logic
-│   │   ├── rich-response-builder.js # RichBuilder, sendUnifiedResponse, sendHtmlApp,
-│   │   │                            #   decodeUnifiedResponse, decodeHtmlRich
 │   │   ├── rich-message-utils.js # Legacy richResponse (code/table/links) builders
+│   │   ├── optional-media.js     # Lazy sharp/fluent-ffmpeg loaders
+│   │   ├── html-app.js           # checkHtmlApp pre-flight audit for HTML mini apps
+│   ├── MessageBuilder/           # Integrated MessageBuilder 4.7 (from elaina-baileys)
+│   │   ├── index.js              # AIRich, Button, ButtonV2, Carousel, Toolkit
+│   │   └── extras.js             # htmlSection, sendHtmlApp, primitives catalog, decodeAIRich
 │   │   ├── link-preview.js       # URL preview generation
 │   │   ├── auth-utils.js         # Key bundle parsing/validation
 │   │   ├── browser-utils.js      # Browsers.* presets
@@ -1096,10 +1063,9 @@ Baileys/
 │   ├── index.js                  # Generated protobuf classes (proto.*)
 │   └── index.d.ts                # Full protobuf typings
 ├── examples/
-│   ├── rich-response.js          # Unified response primitives demo
-│   ├── html-rich.js              # HTML mini app: counter + canvas animation
-│   ├── html-tictactoe.js         # HTML mini app: Tic-Tac-Toe with score
-│   └── html-snake.js             # HTML mini app: Snake (keyboard + touch)
+│   ├── ai-rich.js                # AIRich demo: text/code/table + sendEdit live-edit
+│   ├── html-rich.js              # HTML mini app: counter demo (checkHtmlApp pre-flight)
+│   └── buttons-carousel.js       # Button, list/selection, carousel demos
 ├── tests/
 │   ├── rich-response.test.js     # Roundtrip + malformed-data safety tests
 │   ├── html-rich.test.js         # HTML mini app roundtrip tests
@@ -1156,15 +1122,13 @@ import {
 
 | File | Description |
 |---|---|
-| `rich-response.js` | AI Rich Response / Unified Response primitives demo |
-| `html-rich.js` | HTML Rich Message — static + CSS + JS + button + counter + canvas animation |
-| `html-tictactoe.js` | 3x3 Tic-Tac-Toe mini app — turn order, winner detection, reset, score, dark UI |
-| `html-snake.js` | Snake mini app — canvas grid, food, score, level, keyboard + touch, pause, reset |
+| `ai-rich.js` | AIRich demo — primitives + live-edit + reading rich messages |
+| `html-rich.js` | HTML Mini App demo — counter app + checkHtmlApp pre-flight |
 
 Run any example with:
 
 ```bash
-DEMO_JID=628xxxxxxxxxx@s.whatsapp.net node examples/html-snake.js
+DEMO_JID=628xxxxxxxxxx@s.whatsapp.net node examples/html-rich.js
 ```
 
 ### Tests

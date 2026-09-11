@@ -1,165 +1,78 @@
 /**
- * examples/html-rich.js
- * Yudzxml@Changes 03-09-26
+ * HTML Mini App — kirim halaman HTML interaktif (7.6.0, engine Elaina 1.3.9)
  *
- * HTML Rich Message / HTML Mini App demo (GenAIaeacdsnwHtmlPrimitive).
+ * Halaman HTML+CSS+JS utuh dikirim verbatim lewat GenAIaeacdsnwHtmlPrimitive
+ * dan dirender sebagai WebView native oleh WhatsApp ANDROID.
+ * Catatan: WA Web/Desktop/iOS hanya menampilkan label teksnya saja.
  *
- * Demonstrates:
- *   1. sock.sendUnifiedResponse(jid, { text, sections: [RichBuilder.html(html)] })
- *   2. sock.sendHtmlApp(jid, html, options)  — one-shot helper with the
- *      bypassDownload MESSAGE_EDIT follow-up (recommended for mini apps)
- *   3. decodeHtmlRich() capture of incoming HTML rich responses
- *
- * The HTML below covers: static layout, CSS, JavaScript, button, counter
- * and an animated canvas — all inside the primitive payload (never markdown,
- * never a code block, never the plain text field).
- *
- * Run: DEMO_JID=628xxxxxxxxxx@s.whatsapp.net node examples/html-rich.js
+ * Jalankan:
+ *   node examples/html-rich.js
  */
-import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, RichBuilder, decodeHtmlRich } from '../lib/index.js';
-import pino from 'pino';
+import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, sendHtmlApp, checkHtmlApp } from '../lib/index.js'
 
-const DEMO_JID = process.env.DEMO_JID; // any chat JID you want to send the demos to
+const DEMO_JID = '628xxxxxxx@s.whatsapp.net' // ganti dengan nomor tujuan
 
-// ------------------------------------------------------------------
-// Simple HTML mini app: static + CSS + JS + button + counter + canvas animation
-// ------------------------------------------------------------------
-const html = `
-<!DOCTYPE html>
+const html = `<!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-body {
-  background: #111;
-  color: white;
-  font-family: sans-serif;
-  text-align: center;
-}
-
-button {
-  padding: 12px;
-  border-radius: 10px;
-}
+  body { font-family: sans-serif; background: #0f172a; color: #e2e8f0;
+         display: flex; flex-direction: column; align-items: center; justify-content: center;
+         height: 240px; margin: 0; }
+  h2 { margin: 0 0 8px; color: #38bdf8; }
+  button { margin-top: 12px; padding: 8px 18px; border: 0; border-radius: 8px;
+           background: #38bdf8; color: #0f172a; font-weight: 700; }
+  span { font-size: 40px; font-weight: 800; }
 </style>
 </head>
-
 <body>
-
-<h2>YUDZXML HTML RICH</h2>
-
-<div id="count">0</div>
-
-<button onclick="add()">
-  +1
-</button>
-
-<canvas id="fx" width="240" height="120"></canvas>
-
-<script>
-let count = 0
-
-function add() {
-  count++
-
-  document.getElementById('count')
-    .textContent = count
-}
-
-const canvas = document.getElementById('fx')
-const ctx = canvas.getContext('2d')
-let t = 0
-
-function loop() {
-  t += 0.05
-  ctx.fillStyle = '#111'
-  ctx.fillRect(0, 0, 240, 120)
-
-  ctx.fillStyle = '#25D366'
-  for (let i = 0; i < 5; i++) {
-    const x = 20 + i * 50
-    const y = 60 + Math.sin(t + i) * 30
-    ctx.beginPath()
-    ctx.arc(x, y, 8, 0, Math.PI * 2)
-    ctx.fill()
-  }
-  requestAnimationFrame(loop)
-}
-loop()
-</script>
-
+  <h2>COUNTER MINI APP</h2>
+  <span id="n">0</span>
+  <button onclick="bump()">+1</button>
+  <script>
+    let x = 0
+    function bump() { document.getElementById('n').textContent = ++x }
+  </script>
 </body>
-</html>
-`;
+</html>`
 
-const run = async () => {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info_html_rich');
-    const { version } = await fetchLatestBaileysVersion();
+async function main() {
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info')
+    const { version } = await fetchLatestBaileysVersion()
 
     const sock = makeWASocket({
         version,
         auth: state,
-        logger: pino({ level: 'silent' }),
-        browser: ['HTML Rich Example', 'Chrome', '1.0.0']
-    });
+        printQRInTerminal: false
+    })
 
-    sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('creds.update', saveCreds)
+    sock.ev.on('connection.update', async ({ connection, qr }) => {
+        if (qr) console.log('Scan QR ini di WhatsApp:', qr.slice(0, 40) + '...')
+        if (connection !== 'open') return
 
-    // Capture / decode — every incoming HTML mini app is extracted back to plain HTML
-    sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        if (type !== 'notify') return;
-        for (const msg of messages) {
-            const decoded = decodeHtmlRich(msg); // never throws
-            if (decoded.found) {
-                console.log('=== HTML MINI APP CAPTURED (GenAIaeacdsnwHtmlPrimitive) ===');
-                console.log('responseId:', decoded.responseId);
-                console.log('trustedSources:', decoded.trustedSources);
-                console.log('html length:', decoded.html?.length, 'chars');
-                console.log(decoded.html);
-            }
-        }
-    });
+        // Opsional: pre-flight check (ukuran wire, remote resource, dsb.)
+        const report = checkHtmlApp(html, { height: 260 })
+        console.log('checkHtmlApp:', report.ok ? 'OK' : report.problems, report.warnings)
 
-    await new Promise((resolve, reject) => {
-        sock.ev.on('connection.update', function listener({ connection, lastDisconnect }) {
-            if (connection === 'open') {
-                sock.ev.off('connection.update', listener);
-                resolve();
-            } else if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== 401) {
-                reject(lastDisconnect?.error);
-            }
-        });
-    });
+        // Kirim mini app — default 1x relay (tanpa edit ulang).
+        // bypassDownload: true kalau kartu tidak muncul tanpa edit (2x relay).
+        const sent = await sendHtmlApp(sock, DEMO_JID, html, {
+            title: 'DEMO MINI APP 7.6.0',   // baris disclaimer di atas kartu
+            label: 'Counter',               // fallback teks untuk WA Web/Desktop
+            trustedSources: ['example.com'],
+            height: 260                     // piksel — cegah card "shudder"
+        })
+        console.log('HTML mini app terkirim:', sent.key.id)
 
-    if (!DEMO_JID) {
-        console.log('Set DEMO_JID to send the demos, e.g. DEMO_JID=62812xxxx@s.whatsapp.net');
-        sock.end(undefined);
-        return;
-    }
+        // Dua cara lain:
+        // await sock.sendHtmlApp(DEMO_JID, html, { label: 'Counter' })  // shim socket
+        // import { htmlSection, AIRich } ...                            // gabung ke builder
+        // const rich = new AIRich(sock).addText('Menemani mini app:')
+        //                        .addSection(htmlSection(html, { height: 260 }))
+        // await rich.send(DEMO_JID)
+    })
+}
 
-    // 1. sendUnifiedResponse + RichBuilder.html
-    await sock.sendUnifiedResponse(DEMO_JID, {
-        text: 'YUDZXML HTML RICH',
-        sections: [RichBuilder.html(html)]
-    });
-    console.log('[1] sendUnifiedResponse + RichBuilder.html sent');
-
-    await new Promise(r => setTimeout(r, 2000));
-
-    // 2. sendHtmlApp — one-shot helper (relay + bypassDownload MESSAGE_EDIT follow-up)
-    await sock.sendHtmlApp(DEMO_JID, html, {
-        title: 'YUDZXML HTML APP',
-        text: 'Demo counter + canvas animation',
-        height: 420 // optional: lock the app to a fixed height with a scroll shim
-    });
-    console.log('[2] sendHtmlApp sent');
-
-    console.log('Done. Open WhatsApp on Android — the HTML should render as an interactive mini app.');
-    await new Promise(r => setTimeout(r, 3000));
-    sock.end(undefined);
-};
-
-run().catch(err => {
-    console.error(err);
-    process.exit(1);
-});
+main().catch(console.error)

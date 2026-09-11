@@ -6,6 +6,8 @@ export * from "./Defaults/index.js";
 export * from "./WABinary/index.js";
 export * from "./WAM/index.js";
 export * from "./WAUSync/index.js";
+export * from "./MessageBuilder/index.js";
+export * from "./MessageBuilder/extras.js";
 export { makeWASocket };
 export default makeWASocket;
 import makeWASocket from './Socket/index.js';
