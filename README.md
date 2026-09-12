@@ -650,15 +650,37 @@ await sock.sendMessage(jid, {
 
 ### Group Status (Group Story)
 
-Post a status to a group — supports text, image, and video:
+Post a status to a group — colored text, image, video, audio, or prebuilt messages (parity with `@nuiisweety/baileys`):
 
 ```ts
-await sock.sendMessage(jid, {
+// colored text status (backgroundColor / textColor / font)
+await sock.sendMessage(groupJid, {
     groupStatusMessage: {
-        text: 'Hello group status!' // also supports image/video
+        text: 'Status warna-warni!',
+        backgroundColor: '#ff6b9d',   // hex string or ARGB integer
+        textColor: '#ffffff',
+        font: 3                       // text font style (number)
+    }
+})
+
+// media status — image / video / audio pass through the normal media pipeline
+await sock.sendMessage(groupJid, {
+    groupStatusMessage: {
+        video: { url: './video.mp4' }, // or Buffer / http url
+        caption: 'Story grup!'
+    }
+})
+
+// advanced: audience restriction + fully prebuilt inner message
+await sock.sendMessage(groupJid, {
+    groupStatusMessage: {
+        audienceType: 2,               // -> contextInfo.statusAudienceMetadata
+        message: { videoMessage: { /* prebuilt */ } }
     }
 })
 ```
+
+Notes: text builds an `extendedTextMessage` (colors/font live on it); audio uses the v1 `groupStatusMessage` wrapper for old-client compatibility, everything else uses `groupStatusMessageV2`. `audienceType` defaults to `0`.
 
 ### Quick Message Operations
 
