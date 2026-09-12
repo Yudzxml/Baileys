@@ -39,11 +39,14 @@ const parseUnified = (msg) => {
 
 test('htmlSection forwards url to the primitive (WebView base origin)', () => {
     const section = htmlSection(HTML, { url: 'https://nixel.dev', trustedSources: ['nixel.dev'] });
+    // proven wire shape wraps the layout in GenAIUnifiedResponseSection
+    assert.equal(section?.__typename, 'GenAIUnifiedResponseSection');
     const primitive = section?.view_model?.primitive;
     assert.equal(primitive?.url, 'https://nixel.dev');
     assert.deepEqual(primitive?.trusted_sources, ['nixel.dev']);
     // backward compatible: no url -> no url key (old opaque-origin behaviour)
-    const bare = htmlSection(HTML);
+    const bare = htmlSection(HTML, { sectionTypename: null });
+    assert.equal(bare?.__typename, undefined);
     assert.equal(bare?.view_model?.primitive?.url, undefined);
     assert.throws(() => htmlSection(HTML, { url: '   ' }), TypeError);
 });
@@ -55,7 +58,9 @@ test('sendHtmlApp keeps url + trusted_sources on the section primitive', async (
         trustedSources: ['nixel.dev']
     });
     const unified = parseUnified(firstRichRelay(sock));
-    const primitive = unified.sections?.[0]?.view_model?.primitive;
+    const section = unified.sections?.[0];
+    assert.equal(section?.__typename, 'GenAIUnifiedResponseSection');
+    const primitive = section?.view_model?.primitive;
     assert.equal(primitive?.url, 'https://nixel.dev');
     assert.deepEqual(primitive?.trusted_sources, ['nixel.dev']);
 });

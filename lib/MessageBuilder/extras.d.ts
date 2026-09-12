@@ -97,6 +97,8 @@ export declare function htmlSection(html: string, options?: {
     typename?: string;
     /** WebView base origin (e.g. https://example.com) — without it the WebView runs on an opaque/null origin and WebSocket/fetch are blocked */
     url?: string;
+    /** wrapper typename on the section object, defaults to 'GenAIUnifiedResponseSection' (proven wire shape); pass null for the bare layout */
+    sectionTypename?: string | null;
 }): any;
 
 export declare function sendHtmlApp(sock: any, jid: string, html: string, options?: {
