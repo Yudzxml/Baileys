@@ -95,6 +95,8 @@ export declare function htmlSection(html: string, options?: {
     trustedSources?: string[];
     height?: number;
     typename?: string;
+    /** WebView base origin (e.g. https://example.com) — without it the WebView runs on an opaque/null origin and WebSocket/fetch are blocked */
+    url?: string;
 }): any;
 
 export declare function sendHtmlApp(sock: any, jid: string, html: string, options?: {
@@ -106,6 +108,14 @@ export declare function sendHtmlApp(sock: any, jid: string, html: string, option
     scrollButtons?: boolean | ScrollControlsOptions;
     typename?: string;
     id?: string;
+    /** WebView base origin (e.g. https://example.com) — required for WebSocket/fetch to work inside the mini app */
+    url?: string;
+    /** render the HTML as an embedded_screens bottom-sheet (FOAIDNixelButtonSheets) instead of a plain section */
+    embedded?: boolean;
+    /** title of the embedded screen sheet (embedded mode) */
+    screenTitle?: string;
+    /** title of the first tab inside the sheet (embedded mode) */
+    tabHeader?: string;
     bypassDownload?: boolean;
     guard?: boolean | 'warn';
     [key: string]: any;

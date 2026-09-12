@@ -965,6 +965,17 @@ await sendHtmlApp(sock, jid, html, {
     trustedSources: []
 })
 
+// 1b) Trusted-origin mini app — the WebView gets a real https base origin,
+//     so `new WebSocket()` / fetch work inside the app
+await sendHtmlApp(sock, jid, html, {
+    url: 'https://your.domain',        // WebView base origin (required for WebSocket/fetch)
+    trustedSources: ['your.domain'],
+    embedded: true,                    // render as embedded_screens bottom-sheet (proven shape)
+    screenTitle: 'Preview',            // sheet title (embedded mode)
+    tabHeader: 'WS Tester',            // first tab header (embedded mode)
+    label: 'WS Tester'
+})
+
 // 2) Socket shim (same options)
 await sock.sendHtmlApp(jid, html, { label: 'Demo counter' })
 
@@ -974,9 +985,11 @@ rich.addSection(htmlSection(html, { height: 420 }))
 await rich.send(jid)
 ```
 
-`sendHtmlApp` relays **once** by default (no flicker for static cards); pass `bypassDownload: true` to add the proven `protocolMessage(type 14 MESSAGE_EDIT)` follow-up that forces a re-render. `checkHtmlApp(html)` runs a pre-flight audit (wire size budget, remote resources, storage APIs, timers) and returns `{ ok, problems, warnings }` — the WebView is offline and opaque-origin, so heed its warnings.
+`sendHtmlApp` relays **once** by default (no flicker for static cards); pass `bypassDownload: true` to add the proven `protocolMessage(type 14 MESSAGE_EDIT)` follow-up that forces a re-render. `checkHtmlApp(html)` runs a pre-flight audit (wire size budget, remote resources, storage APIs, timers) and returns `{ ok, problems, warnings }`.
 
-**Wire format**: the HTML travels verbatim inside a JSON-only unified section `{ view_model: { primitive: { payload, trusted_sources, __typename: 'GenAIaeacdsnwHtmlPrimitive' }, __typename: 'GenAISingleLayoutViewModel' } }` → unified JSON `{ response_id, sections }` → bytes in `AIRichResponseMessage.unifiedResponse.data` (field 3) → `Message.botForwardedMessage` (field 834) → `relayMessage`.
+> 🔑 **WebView origin & WebSocket** — by default the mini app WebView runs on an **opaque/null origin** (offline), so `new WebSocket()` / `fetch()` throw SecurityError. Pass `url: 'https://your.domain'` (+ matching `trustedSources`) to give the WebView a real https base origin — sockets then connect fine. Combine with `embedded: true` to render inside an `embedded_screens` bottom-sheet (`FOAIDNixelButtonSheets`), the exact wire shape of proven hand-relayed payloads.
+
+**Wire format**: the HTML travels verbatim inside a JSON-only unified section `{ view_model: { primitive: { payload, url, trusted_sources, __typename: 'GenAIaeacdsnwHtmlPrimitive' }, __typename: 'GenAISingleLayoutViewModel' } }` → unified JSON `{ response_id, sections }` → bytes in `AIRichResponseMessage.unifiedResponse.data` (field 3) → `Message.botForwardedMessage` (field 834) → `relayMessage`.
 
 > ⚠️ `GenAIaeacdsnwHtmlPrimitive` is an **Android-only** primitive. WA Web/Desktop show only the `label` text; iOS is untested.
 
